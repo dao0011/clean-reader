@@ -211,7 +211,7 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<a class=example-link id=exampleLink onclick=useExample()>&#x1f4ac; Try with an example</a>
+<button type=button class=example-link id=exampleLink onclick=useExample()>&#x1f4ac; Try with an example</button>
 
 <div class=input-group>
 <input type=url id=url placeholder="https://example.com/article" autofocus>
