@@ -21,6 +21,13 @@
       "Bash(wc:*)",
       "Bash(file:*)",
       "Bash(nslookup *)"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(rm -rf:*)",
+      "Bash(wrangler delete:*)"
     ]
   }
 }
