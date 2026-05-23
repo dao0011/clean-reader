@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git init)",
+      "Bash(git config *)",
+      "Bash(mkdir:*)",
+      "Bash(sed:*)",
+      "Bash(cp:*)",
+      "Bash(cat:*)",
+      "Bash(npx wrangler deploy *)",
+      "Bash(npx wrangler kv *)",
+      "Bash(npx wrangler pages *)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(wc:*)",
+      "Bash(file:*)",
+      "Bash(nslookup *)"
+    ]
+  }
+}
