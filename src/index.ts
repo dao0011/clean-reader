@@ -211,7 +211,7 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<button type=button class=example-link id=exampleLink>&#x1f4ac; Try with an example</button>
+<button type=button class=example-link id=exampleLink onclick="inp.value=EXAMPLE_URLS[0];inp.focus();extract(EXAMPLE_URLS.slice(1))">&#x1f4ac; Try with an example</button>
 
 <div class=input-group>
 <input type=url id=url placeholder="https://example.com/article" autofocus>
@@ -296,16 +296,7 @@ const EXAMPLE_URLS=[
   'https://www.technologyreview.com/2024/06/12/1094519/what-is-ai/',
   'https://en.wikipedia.org/wiki/Web_scraping'
 ];
-(function(){
-  const el=document.getElementById('exampleLink');
-  if(!el)return;
-  el.addEventListener('click',function(){
-    el.textContent='Loading...';
-    inp.value=EXAMPLE_URLS[0];
-    inp.focus();
-    extract(EXAMPLE_URLS.slice(1));
-  });
-})();
+// example button uses onclick attribute — no JS binding needed
 
 // ── HTML sanitizer ──
 function sanitize(html){
