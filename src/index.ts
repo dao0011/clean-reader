@@ -211,7 +211,7 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<button type=button class=example-link id=exampleLink onclick=useExample()>&#x1f4ac; Try with an example</button>
+<button type=button class=example-link id=exampleLink>&#x1f4ac; Try with an example</button>
 
 <div class=input-group>
 <input type=url id=url placeholder="https://example.com/article" autofocus>
@@ -296,14 +296,16 @@ const EXAMPLE_URLS=[
   'https://www.technologyreview.com/2024/06/12/1094519/what-is-ai/',
   'https://en.wikipedia.org/wiki/Web_scraping'
 ];
-function useExample(){
-  const link=document.getElementById('exampleLink');
-  if(link){link.textContent='Starting...';link.style.pointerEvents='none';}
-  inp.value=EXAMPLE_URLS[0];
-  inp.focus();
-  extract(EXAMPLE_URLS.slice(1));
-  setTimeout(()=>{if(link&&link.textContent==='Starting...'){link.textContent='Try with an example';link.style.pointerEvents='auto';}},8000);
-}
+(function(){
+  const el=document.getElementById('exampleLink');
+  if(!el)return;
+  el.addEventListener('click',function(){
+    el.textContent='Loading...';
+    inp.value=EXAMPLE_URLS[0];
+    inp.focus();
+    extract(EXAMPLE_URLS.slice(1));
+  });
+})();
 
 // ── HTML sanitizer ──
 function sanitize(html){
