@@ -296,7 +296,6 @@ const EXAMPLE_URLS=[
   'https://www.technologyreview.com/2024/06/12/1094519/what-is-ai/',
   'https://en.wikipedia.org/wiki/Web_scraping'
 ];
-// example button uses onclick attribute — no JS binding needed
 
 // ── HTML sanitizer ──
 function sanitize(html){
@@ -389,7 +388,7 @@ function downloadFile(content,ext,mime){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   const name=currentDownloadData?.title||'article';
-  a.download=name.replace(/[<>:\\"/\\\\|?*]/g,'_').slice(0,50)+ext;
+  a.download=name.replace(/[<>:\\"/\\|?*]/g,'_').slice(0,50)+ext;
   a.click();
 }
 
