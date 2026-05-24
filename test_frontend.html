@@ -1,19 +1,4 @@
-import { Hono } from 'hono'
-// @types/linkedom does not exist, linkedom bundles its own types
-import { parseHTML } from 'linkedom'
-import { Readability } from '@mozilla/readability'
-
-type Bindings = {
-  AI: { run: (model: string, opts: { messages: { role: string; content: string }[] }) => Promise<{ response: string }> }
-  CACHE: KVNamespace
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
-
-// ── Frontend (Readwise-style, dark mode, mobile-first) ─────
-// Kimi optimization items applied: 1(value prop+footer), 2(reading mode), 3(staged loading),
-//   4(summary card), 5(empty state), 7(download), 8(error states). Skipped #6(theme only).
-const HTML = `<!doctype html>
+<!doctype html>
 <html lang=en>
 <head>
 <meta charset=utf-8>
@@ -127,7 +112,7 @@ button:disabled{opacity:0.6;cursor:not-allowed;transform:none;box-shadow:none}
 .summary-label{font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:6px}
 .summary-points{list-style:none;padding:0}
 .summary-points li{position:relative;padding-left:20px;margin-bottom:6px}
-.summary-points li::before{content:'\\2726';position:absolute;left:0;color:var(--accent);font-size:.8rem}
+.summary-points li::before{content:'\2726';position:absolute;left:0;color:var(--accent);font-size:.8rem}
 /* ── Article metadata (#4) ── */
 .article-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;font-size:.8rem;color:var(--text-secondary)}
 .article-meta span{display:inline-flex;align-items:center;gap:4px}
@@ -352,7 +337,7 @@ function showStagedLoading(){
 
 // ── Word count & reading time (#4) ──
 function estimateReadingTime(text){
-  const wc=(text||'').trim().split(/\\s+/).length;
+  const wc=(text||'').trim().split(/\s+/).length;
   const rt=Math.max(1,Math.round(wc/200));
   return {words:wc,minutes:rt};
 }
@@ -364,15 +349,15 @@ function doDownloadMarkdown(){
   if(!currentDownloadData)return;
   const {title,text,summary,source}=currentDownloadData;
   const now=new Date().toISOString().slice(0,10);
-  const frontmatter='---\\ntitle: "'+(title||'Untitled')+'"\\nsource: "'+source+'"\\nextracted_at: "'+now+'"\\nsummary: "'+summary+'"\\n---\\n\\n';
-  const body='# '+title+'\\n\\n'+text;
+  const frontmatter='---\ntitle: "'+(title||'Untitled')+'"\nsource: "'+source+'"\nextracted_at: "'+now+'"\nsummary: "'+summary+'"\n---\n\n';
+  const body='# '+title+'\n\n'+text;
   downloadFile(frontmatter+body,'.md','text/markdown');
 }
 
 function doDownloadPlain(){
   if(!currentDownloadData)return;
   const {title,text}=currentDownloadData;
-  downloadFile(title+'\\n\\n'+text,'.txt','text/plain');
+  downloadFile(title+'\n\n'+text,'.txt','text/plain');
 }
 
 function doDownloadHTML(){
@@ -387,7 +372,7 @@ function downloadFile(content,ext,mime){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   const name=currentDownloadData?.title||'article';
-  a.download=name.replace(/[<>:\\"/\\|?*]/g,'_').slice(0,50)+ext;
+  a.download=name.replace(/[<>:\"/\|?*]/g,'_').slice(0,50)+ext;
   a.click();
 }
 
@@ -442,7 +427,7 @@ function renderResult(d,url){
   const hostname=url?(()=>{try{return new URL(url).hostname}catch{return ''}})():'';
   // Build summary points
   const summaryText=d.summary||'Summary unavailable';
-  const points=summaryText.split(/\\.\\s+/).filter(Boolean);
+  const points=summaryText.split(/\.\s+/).filter(Boolean);
   const summaryHtml=points.length>1
     ? '<ul class=summary-points>'+points.map(p=>'<li>'+(p.endsWith('.')?p:p+'.')+'</li>').join('')+'</ul>'
     : '<div>'+summaryText+'</div>';
@@ -477,7 +462,7 @@ function renderResult(d,url){
       // Actions (#7)
       '<div class=actions>'+
         '<div class=dropdown>'+
-          '<button class=dropdown-toggle onclick="event.stopPropagation();this.nextElementSibling.classList.toggle(\'open\')">📥 Download <span style=font-size:.75rem>▼</span></button>'+
+          '<button class=dropdown-toggle onclick="event.stopPropagation();this.nextElementSibling.classList.toggle('open')">📥 Download <span style=font-size:.75rem>▼</span></button>'+
           '<div class=dropdown-menu>'+
             '<button class=dropdown-item data-format=md><span>📝</span> Markdown <span class=ext-info>~'+Math.round((d.textContent||'').length/1024)+' KB</span></button>'+
             '<button class=dropdown-item data-format=txt><span>📄</span> Plain Text</button>'+
@@ -555,207 +540,4 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 </body>
-</html>`
-
-app.get('/', (c) => c.html(HTML, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' }))
-
-// ── Helpers ───────────────────────────────────────────────
-function normalizeUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    u.hash = '';
-    u.protocol = u.protocol.toLowerCase();
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'spm', 'from'].forEach(param => {
-      u.searchParams.delete(param);
-    });
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
-
-// ── Extract API ───────────────────────────────────────────
-app.post('/api/extract', async (c) => {
-  const { url } = await c.req.json<{ url: string }>()
-
-  if (!url || !/^https?:\/\/.+/i.test(url)) {
-    return c.json({ error: 'Please enter a valid URL' }, 400)
-  }
-
-  const cacheKey = normalizeUrl(url)
-
-  // Check KV cache
-  let cached: string | null = null
-  try { cached = await c.env.CACHE?.get(cacheKey) } catch {}
-  if (cached) return c.json(JSON.parse(cached))
-
-  // Fetch target page
-  let html: string
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-      },
-    })
-    if (!res.ok) return c.json({ error: `Failed to fetch article (HTTP ${res.status})` }, 400)
-    html = await res.text()
-  } catch {
-    return c.json({ error: 'Failed to fetch article. Please check your link.' }, 400)
-  }
-
-  // Extract with Readability
-  let title = ''
-  let content = ''
-  let textContent = ''
-  try {
-    const { document } = parseHTML(html)
-    const article = new Readability(document).parse()
-    if (article) {
-      title = article.title || ''
-      content = article.content || ''
-      textContent = article.textContent || ''
-    }
-  } catch { /* extraction failed, use empty defaults */ }
-
-  if (!title && !textContent) {
-    return c.json({ error: 'Could not extract content from this page.' }, 400)
-  }
-
-  // AI summary via Workers AI binding
-  let summary = 'Summary unavailable'
-  try {
-    const promptText = textContent.slice(0, 8000)
-    const ai = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-      messages: [
-        { role: 'system', content: 'Summarize this article in 3 concise sentences. Match the language of the original text.' },
-        { role: 'user', content: promptText },
-      ],
-    })
-    summary = ai.response || summary
-  } catch { /* AI failed, summary stays as fallback */ }
-
-  const result = { title, content, textContent, summary, url }
-
-  // Cache 24h
-  try { await c.env.CACHE?.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 }) } catch {}
-
-  return c.json(result)
-})
-
-// ── Server-rendered extract page (no JS needed) ──
-app.get('/api/extract-page', async (c) => {
-  const urlParam = c.req.query('url')
-  const url = urlParam && /^https?:\/\/.+/i.test(urlParam) ? urlParam : 'https://en.wikipedia.org/wiki/Web_scraping'
-  const cacheKey = normalizeUrl(url)
-  let result: any = null
-
-  // Check KV cache
-  try {
-    const cached = await c.env.CACHE?.get(cacheKey)
-    if (cached) result = JSON.parse(cached)
-  } catch {}
-
-  if (!result) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-      })
-      const html = await res.text()
-      const { document } = parseHTML(html)
-      const article = new Readability(document).parse()
-      if (!article || (!article.title && !article.textContent)) {
-        return c.html('<html><body><h1>Failed to extract article</h1><p>Could not extract content. <a href="/">Go back</a></p></body></html>')
-      }
-      let summary = 'Summary unavailable'
-      try {
-        const promptText = (article.textContent || '').slice(0, 8000)
-        const ai = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-          messages: [
-            { role: 'system', content: 'Summarize this article in 3 concise sentences. Match the language of the original text.' },
-            { role: 'user', content: promptText },
-          ],
-        })
-        summary = ai.response || summary
-      } catch {}
-      result = { title: article.title, content: article.content, textContent: article.textContent, summary, url }
-      try { await c.env.CACHE?.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 }) } catch {}
-    } catch {
-      return c.html('<html><body><h1>Error</h1><p>Failed to fetch article. <a href="/">Go back</a></p></body></html>')
-    }
-  }
-
-  const { title, content, textContent, summary } = result
-  const wordCount = (textContent || '').trim().split(/\s+/).length
-  const readTime = Math.max(1, Math.round(wordCount / 200))
-
-  const points = (summary || '').split(/\.\s+/).filter(Boolean)
-  const summaryHtml = points.length > 1
-    ? '<ul>' + points.map((p: string) => '<li>' + (p.endsWith('.') ? p : p + '.') + '</li>').join('') + '</ul>'
-    : '<p>' + summary + '</p>'
-
-  return c.html(`<!doctype html>
-<html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>${escapeHtml(title || 'Untitled')} — CleanReader</title>
-<meta name=robots content=noindex>
-<style>
-:root{--bg:#fafaf9;--card-bg:#fff;--text:#1f2937;--text-secondary:#6b7280;--text-body:#374151;--border:#e5e7eb;--accent:#2563eb;--radius:12px;--radius-lg:16px;--font:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-@media(prefers-color-scheme:dark){:root{--bg:#0f0f0f;--card-bg:#1a1a1a;--text:#e5e5e5;--text-secondary:#a3a3a3;--text-body:#d1d5db;--border:#333;--summary-bg:#111827}}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
-.container{max-width:720px;margin:0 auto;padding:40px 20px}
-.back{margin-bottom:24px}
-.back a{color:var(--accent);text-decoration:none;font-size:.9rem}
-.back a:hover{text-decoration:underline}
-.card{background:var(--card-bg);border-radius:var(--radius-lg);padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.06)}
-@media(max-width:640px){.container{padding:24px 16px}.card{padding:24px 16px}}
-h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:8px;line-height:1.3}
-.source{display:inline-block;margin-bottom:20px;color:var(--accent);font-size:.9rem;text-decoration:none;word-break:break-all}
-.source:hover{text-decoration:underline}
-.meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;font-size:.8rem;color:var(--text-secondary)}
-.summary-card{background:var(--summary-bg, #f8fafc);padding:16px 20px;border-radius:var(--radius);border-left:4px solid var(--accent);margin-bottom:24px;font-size:.95rem;line-height:1.7}
-.summary-label{font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:6px}
-.summary-card ul{list-style:none;padding:0}
-.summary-card li{position:relative;padding-left:20px;margin-bottom:6px}
-.summary-card li::before{content:'\\2726';position:absolute;left:0;color:var(--accent);font-size:.8rem}
-.content{font-size:1.125rem;line-height:1.8;color:var(--text-body);max-width:65ch}
-.content p{margin-bottom:1em}
-.content img{max-width:100%;height:auto;border-radius:var(--radius);display:block;margin:0 auto}
-.content blockquote{border-left:3px solid #9ca3af;font-style:italic;padding:8px 16px;margin:1em 0;background:var(--summary-bg, #f8fafc);border-radius:0 8px 8px 0}
-.content a{color:var(--accent);text-decoration:none}
-.content a:hover{text-decoration:underline}
-</style>
-</head>
-<body>
-<div class=container>
-<div class=back><a href=/>← Back to CleanReader</a></div>
-<div class=card>
-<h1>${escapeHtml(title || 'Untitled')}</h1>
-<a class=source href="${escapeHtml(url)}" target=_blank rel=noopener>${escapeHtml(new URL(url).hostname)}</a>
-<div class=meta><span>🕒 ${readTime} min read</span><span>📋 ${wordCount.toLocaleString()} words</span><span>🌐 ${escapeHtml(new URL(url).hostname)}</span></div>
-<div class=summary-label>AI Summary</div>
-<div class=summary-card>${summaryHtml}</div>
-<div class=content>${sanitize2(content || '')}</div>
-</div>
-</div>
-</body>
-</html>`, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' })
-})
-
-// ── Helpers for server-rendered page ──
-function escapeHtml(str: string): string {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
-}
-
-function sanitize2(html: string): string {
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,'').replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,'')
-}
-
-export default app
+</html>
