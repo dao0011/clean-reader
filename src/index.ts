@@ -214,12 +214,12 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<a class=example-link href=/api/extract-page>&#x1f4ac; Try with an example</a>
+<a class=example-link id=exampleLink href="/api/extract-page?url=https://en.wikipedia.org/wiki/Web_scraping" onclick="document.body.innerHTML='<div style=\"display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fafaf9\"><div style=\"width:44px;height:44px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite;margin-bottom:20px\"></div><p style=\"color:#374151;font-size:1rem;font-weight:500;margin:0\">Extracting article...</p><p style=\"color:#9ca3af;font-size:.85rem;margin:8px 0 0\">This usually takes 2 seconds</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-color-scheme:dark){body{background:#0f0f0f!important}p{color:#e5e5e5!important}}</style>'">&#x1f4ac; Try with an example</a>
 
-<form action=/api/extract-page method=GET onsubmit="var u=document.getElementById('url');if(!u.value.trim()){return false;}">
+<form action=/api/extract-page method=GET onsubmit="var u=document.getElementById('url');if(!u.value.trim())return false;document.body.innerHTML='<div style=\"display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f9\"><div style=\"width:44px;height:44px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite;margin-bottom:20px\"></div><p style=\"color:#374151;font-size:1rem;font-weight:500;margin:0\">Extracting article...</p><p style=\"color:#9ca3af;font-size:.85rem;margin:8px 0 0\">This usually takes 2 seconds</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-color-scheme:dark){body{background:#0f0f0f!important}p{color:#e5e5e5!important}}</style>'">
 <div class=input-group>
 <input type=url id=url name=url placeholder="https://example.com/article" autofocus>
-<button type=submit>Extract &amp; Summarize</button>
+<button type=submit id=go>Extract &amp; Summarize</button>
 </div>
 </form>
 
@@ -513,7 +513,7 @@ function renderResult(d,url){
 async function extract(retryUrls){
   const url=inp.value.trim();
   if(!url)return;
-  btn.disabled=true;
+  if(btn)btn.disabled=true;
   progressBar.style.setProperty('--progress','0%');
   showStagedLoading();
   const loadStart=Date.now();
@@ -538,7 +538,7 @@ async function extract(retryUrls){
       return;
     }
     showError('Network error. Please try again.');
-  }finally{btn.disabled=false}
+  }finally{if(btn)btn.disabled=false}
 }
 
 // Init download handler for extra safety
