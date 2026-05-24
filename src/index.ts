@@ -27,6 +27,7 @@ const HTML = `<!doctype html>
 <meta property=og:description content="Paste any article link and get a clean, ad-free reading page with AI-generated summary.">
 <meta property=og:type content=website>
 <meta name=theme-color content=#fafaf9>
+<meta name=rev content=2>
 <link rel=icon href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
 <style>
 :root {
@@ -214,9 +215,9 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<a class=example-link id=exampleLink href="/api/extract-page?url=https://en.wikipedia.org/wiki/Web_scraping" onclick=document.body.innerHTML=LOADING_HTML>&#x1f4ac; Try with an example</a>
+<a class=example-link id=exampleLink href="/api/extract-page?url=https://en.wikipedia.org/wiki/Web_scraping">&#x1f4ac; Try with an example</a>
 
-<form action=/api/extract-page method=GET onsubmit="var u=document.getElementById('url');if(!u.value.trim())return false;document.body.innerHTML=LOADING_HTML">
+<form action=/api/extract-page method=GET>
 <div class=input-group>
 <input type=url id=url name=url placeholder="https://example.com/article" autofocus>
 <button type=submit id=go>Extract &amp; Summarize</button>
@@ -250,9 +251,6 @@ const inp=document.getElementById('url');
 const progressBar=document.getElementById('progressBar');
 const pasteArea=document.getElementById('pasteArea');
 const pasteText=document.getElementById('pasteText');
-
-// ── Loading screen for no-JS fallback ──
-const LOADING_HTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fafaf9"><div style="width:44px;height:44px;border:3px solid #e5e7eb;border-top-color:#2563eb;border-radius:50%;animation:spin .7s linear infinite;margin-bottom:20px"></div><p style="color:#374151;font-size:1rem;font-weight:500;margin:0">Extracting article...</p><p style="color:#9ca3af;font-size:.85rem;margin:8px 0 0">This usually takes 2 seconds</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}@media (prefers-color-scheme:dark){body{background:#0f0f0f!important}p{color:#e5e5e5!important}}</style>';
 
 // ── Enter key shortcut ──
 inp.addEventListener('keydown',e=>{if(e.key==='Enter')extract()});
