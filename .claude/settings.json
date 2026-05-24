@@ -20,7 +20,14 @@
       "Bash(npm run *)",
       "Bash(wc:*)",
       "Bash(file:*)",
-      "Bash(nslookup *)"
+      "Bash(nslookup *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(rm:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(wrangler:*)",
+      "Bash(winget:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",

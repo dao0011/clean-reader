@@ -18,9 +18,6 @@ const HTML = `<!doctype html>
 <head>
 <meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<meta http-equiv=Cache-Control content="no-cache, no-store, must-revalidate">
-<meta http-equiv=Pragma content=no-cache>
-<meta http-equiv=Expires content=0>
 <title>CleanReader — AI Article Extractor</title>
 <meta name=description content="Paste a link. Get a clean, readable article with an AI summary.">
 <meta property=og:title content="CleanReader — AI Article Extractor">
@@ -214,14 +211,12 @@ footer.main-footer .footer-copy{font-size:.75rem;color:var(--text-secondary);opa
 </div>
 
 <!-- Try with an example (#5) -->
-<a class=example-link href=/api/extract-page>&#x1f4ac; Try with an example</a>
+<button type=button class=example-link id=exampleLink onclick="inp.value=EXAMPLE_URLS[0];inp.focus();extract(EXAMPLE_URLS.slice(1))">&#x1f4ac; Try with an example</button>
 
-<form action=/api/extract-page method=GET onsubmit="var u=document.getElementById('url');if(!u.value.trim()){return false;}">
 <div class=input-group>
-<input type=url id=url name=url placeholder="https://example.com/article" autofocus>
-<button type=submit>Extract &amp; Summarize</button>
+<input type=url id=url placeholder="https://example.com/article" autofocus>
+<button id=go onclick=extract()>Extract &amp; Summarize</button>
 </div>
-</form>
 
 <!-- Paste text fallback (#8) -->
 <div class=paste-text-area id=pasteArea>
@@ -295,6 +290,13 @@ function toggleReadingMode(el){
   el.classList.toggle('active',readingMode);
   document.querySelectorAll('.content')[0]?.classList.toggle('read-mode-only',readingMode);
 }
+
+// ── Use example link (#5) ──
+const EXAMPLE_URLS=[
+  'https://www.technologyreview.com/2024/06/12/1094519/what-is-ai/',
+  'https://en.wikipedia.org/wiki/Web_scraping'
+];
+// example button uses onclick attribute — no JS binding needed
 
 // ── HTML sanitizer ──
 function sanitize(html){
@@ -387,7 +389,7 @@ function downloadFile(content,ext,mime){
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   const name=currentDownloadData?.title||'article';
-  a.download=name.replace(/[<>:\\"/\\|?*]/g,'_').slice(0,50)+ext;
+  a.download=name.replace(/[<>:\\"/\\\\|?*]/g,'_').slice(0,50)+ext;
   a.click();
 }
 
@@ -557,7 +559,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </body>
 </html>`
 
-app.get('/', (c) => c.html(HTML, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache', 'Expires': '0' }))
+app.get('/', (c) => c.html(HTML))
 
 // ── Helpers ───────────────────────────────────────────────
 function normalizeUrl(url: string): string {
@@ -643,119 +645,5 @@ app.post('/api/extract', async (c) => {
 
   return c.json(result)
 })
-
-// ── Server-rendered extract page (no JS needed) ──
-app.get('/api/extract-page', async (c) => {
-  const urlParam = c.req.query('url')
-  const url = urlParam && /^https?:\/\/.+/i.test(urlParam) ? urlParam : 'https://en.wikipedia.org/wiki/Web_scraping'
-  const cacheKey = normalizeUrl(url)
-  let result: any = null
-
-  // Check KV cache
-  try {
-    const cached = await c.env.CACHE?.get(cacheKey)
-    if (cached) result = JSON.parse(cached)
-  } catch {}
-
-  if (!result) {
-    try {
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml',
-        },
-      })
-      const html = await res.text()
-      const { document } = parseHTML(html)
-      const article = new Readability(document).parse()
-      if (!article || (!article.title && !article.textContent)) {
-        return c.html('<html><body><h1>Failed to extract article</h1><p>Could not extract content. <a href="/">Go back</a></p></body></html>')
-      }
-      let summary = 'Summary unavailable'
-      try {
-        const promptText = (article.textContent || '').slice(0, 8000)
-        const ai = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-          messages: [
-            { role: 'system', content: 'Summarize this article in 3 concise sentences. Match the language of the original text.' },
-            { role: 'user', content: promptText },
-          ],
-        })
-        summary = ai.response || summary
-      } catch {}
-      result = { title: article.title, content: article.content, textContent: article.textContent, summary, url }
-      try { await c.env.CACHE?.put(cacheKey, JSON.stringify(result), { expirationTtl: 86400 }) } catch {}
-    } catch {
-      return c.html('<html><body><h1>Error</h1><p>Failed to fetch article. <a href="/">Go back</a></p></body></html>')
-    }
-  }
-
-  const { title, content, textContent, summary } = result
-  const wordCount = (textContent || '').trim().split(/\s+/).length
-  const readTime = Math.max(1, Math.round(wordCount / 200))
-
-  const points = (summary || '').split(/\.\s+/).filter(Boolean)
-  const summaryHtml = points.length > 1
-    ? '<ul>' + points.map((p: string) => '<li>' + (p.endsWith('.') ? p : p + '.') + '</li>').join('') + '</ul>'
-    : '<p>' + summary + '</p>'
-
-  return c.html(`<!doctype html>
-<html lang=en>
-<head>
-<meta charset=utf-8>
-<meta name=viewport content="width=device-width,initial-scale=1">
-<title>${escapeHtml(title || 'Untitled')} — CleanReader</title>
-<meta name=robots content=noindex>
-<style>
-:root{--bg:#fafaf9;--card-bg:#fff;--text:#1f2937;--text-secondary:#6b7280;--text-body:#374151;--border:#e5e7eb;--accent:#2563eb;--radius:12px;--radius-lg:16px;--font:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-@media(prefers-color-scheme:dark){:root{--bg:#0f0f0f;--card-bg:#1a1a1a;--text:#e5e5e5;--text-secondary:#a3a3a3;--text-body:#d1d5db;--border:#333;--summary-bg:#111827}}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
-.container{max-width:720px;margin:0 auto;padding:40px 20px}
-.back{margin-bottom:24px}
-.back a{color:var(--accent);text-decoration:none;font-size:.9rem}
-.back a:hover{text-decoration:underline}
-.card{background:var(--card-bg);border-radius:var(--radius-lg);padding:32px;box-shadow:0 4px 24px rgba(0,0,0,0.06)}
-@media(max-width:640px){.container{padding:24px 16px}.card{padding:24px 16px}}
-h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:8px;line-height:1.3}
-.source{display:inline-block;margin-bottom:20px;color:var(--accent);font-size:.9rem;text-decoration:none;word-break:break-all}
-.source:hover{text-decoration:underline}
-.meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;font-size:.8rem;color:var(--text-secondary)}
-.summary-card{background:var(--summary-bg, #f8fafc);padding:16px 20px;border-radius:var(--radius);border-left:4px solid var(--accent);margin-bottom:24px;font-size:.95rem;line-height:1.7}
-.summary-label{font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:6px}
-.summary-card ul{list-style:none;padding:0}
-.summary-card li{position:relative;padding-left:20px;margin-bottom:6px}
-.summary-card li::before{content:'\\2726';position:absolute;left:0;color:var(--accent);font-size:.8rem}
-.content{font-size:1.125rem;line-height:1.8;color:var(--text-body);max-width:65ch}
-.content p{margin-bottom:1em}
-.content img{max-width:100%;height:auto;border-radius:var(--radius);display:block;margin:0 auto}
-.content blockquote{border-left:3px solid #9ca3af;font-style:italic;padding:8px 16px;margin:1em 0;background:var(--summary-bg, #f8fafc);border-radius:0 8px 8px 0}
-.content a{color:var(--accent);text-decoration:none}
-.content a:hover{text-decoration:underline}
-</style>
-</head>
-<body>
-<div class=container>
-<div class=back><a href=/>← Back to CleanReader</a></div>
-<div class=card>
-<h1>${escapeHtml(title || 'Untitled')}</h1>
-<a class=source href="${escapeHtml(url)}" target=_blank rel=noopener>${escapeHtml(new URL(url).hostname)}</a>
-<div class=meta><span>🕒 ${readTime} min read</span><span>📋 ${wordCount.toLocaleString()} words</span><span>🌐 ${escapeHtml(new URL(url).hostname)}</span></div>
-<div class=summary-label>AI Summary</div>
-<div class=summary-card>${summaryHtml}</div>
-<div class=content>${sanitize2(content || '')}</div>
-</div>
-</div>
-</body>
-</html>`, 200, { 'Cache-Control': 'no-cache, no-store, must-revalidate' })
-})
-
-// ── Helpers for server-rendered page ──
-function escapeHtml(str: string): string {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
-}
-
-function sanitize2(html: string): string {
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,'').replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,'')
-}
 
 export default app
